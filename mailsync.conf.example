@@ -1,0 +1,20 @@
+sync_command: /usr/bin/mbsync
+post_sync:
+    - /usr/bin/notmuch new
+    - ~/.mutt/nottoomuch-addresses.sh --update
+
+accounts:
+    gmail:
+        host: imap.example.com
+        user: some.example.email@example.com
+        pass: "only used if pass_cmd doesnt exist"
+        pass_cmd:
+            # this example command assume a gpg encrypted json file with a
+            # 'mail_pass' key, but any command returning your password will do
+            /usr/bin/gpg2 --batch --decrypt ~/.mutt/passwords.gpg | /usr/bin/jq .mail_pass -r
+        # the corresponding mailbox in mbsync configuration
+        local: my_mail
+        boxes:
+            - INBOX
+            - "[Gmail]/Messages envoyés"
+        ssl: True
