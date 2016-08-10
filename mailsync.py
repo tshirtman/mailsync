@@ -128,11 +128,47 @@ def idle_client(account, box):
                   Fore.RESET + Style.RESET_ALL)
 
 
-@cli.command('manager')
-def main():
+@cli.command('suspend')
+def suspend():
+    pass
+
+
+@cli.command('resume')
+def resume():
+    session = get_session()
+    stop_all(session)
+    run(session)
+
+
+def run(session):
+    session.list_windows()[0].list_panes()[0].send_keys(
+        'mailsync fullsync; mailsync idle')
+
+
+@cli.command('idle')
+def idle():
     """Sync all the mailboxes, then spawn clients for monitored mailboxes
     """
-    sync()
+    session = get_session()
+    _main(session)
+    session.attach_session()
+
+
+@cli.command('run')
+def main():
+    """start sync and attach to session
+    """
+    session = get_session()
+    run(session)
+    session.attach_session()
+
+
+@cli.command('stop')
+def stop():
+    stop_all(get_session())
+
+
+def get_session():
     server = libtmux.Server()
     try:
         session = server.find_where({'session_name': 'mailsync'})
@@ -142,13 +178,30 @@ def main():
     if not session:
         session = server.new_session('mailsync')
 
-    window = session.list_windows()[0]
+    return session
 
-    # window.send_keys('%s sync')
+
+def stop_all(session):
+    for w in session.list_windows():
+        for p in w.list_panes()[1:]:
+            p.cmd('send-keys', '^C')
+
+        sleep(1)
+        for p in w.list_panes()[1:]:
+            p.cmd('send-keys', '^D')
+
+    w.list_panes()[0].cmd('send-keys', '^C')
+
+
+@cli.command('fullsync')
+def full_sync():
+    sync()
+
+
+def _main(session):
+    window = session.list_windows()[0]
     i = 0
     for account, c in ACCOUNTS.items():
         for box in c['boxes']:
             spawn_client(window, account, box, split=bool(i))
             i += 1
-
-    session.attach_session()
