@@ -101,7 +101,13 @@ def sync(host=None, box=None):
 
     for c in POST_SYNC_COMMANDS:
         print(Fore.YELLOW + Style.BRIGHT)
-        icheck_output(split(expanduser(c)))
+        icheck_output(
+            [
+                expanduser(x) for x in split(
+                    c.format(host=host or '', box=box or '')
+                )
+            ]
+        )
         print(Style.RESET_ALL + Fore.RESET)
 
     print(Fore.BLUE + Style.BRIGHT +
@@ -194,8 +200,10 @@ def stop_all(session):
 
 
 @cli.command('fullsync')
-def full_sync():
-    sync()
+@click.argument('account')
+@click.argument('box')
+def full_sync(account=None, box=None):
+    sync(host=account, box=box)
 
 
 def _main(session):
