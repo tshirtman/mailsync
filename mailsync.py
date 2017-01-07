@@ -54,7 +54,7 @@ def _idle_client(account, box):
 
     print("connected, {}: {}".format(account, box))
     while True:
-        for m in client.idle_check():
+        for m in client.idle_check(timeout=30):
             if m != (b'OK', b'Still here'):
                 print(Style.BRIGHT + Fore.GREEN,
                       "event: {}, {}, {}".format(account, box, m) +
