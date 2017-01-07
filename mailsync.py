@@ -215,7 +215,11 @@ def stop_all(session):
 def full_sync(account=None, box=None, t=0):
     if t:
         while True:
-            sleep(t)
+            timeout = t
+            while timeout:
+                print(timeout, end=' \r')
+                sleep(1)
+                timeout -= 1
             sync(host=account, box=box)
     else:
         sync(host=account, box=box)
