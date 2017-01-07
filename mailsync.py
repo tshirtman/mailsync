@@ -27,6 +27,7 @@ import libtmux
 ACCOUNTS = {}
 MBSYNC = ''
 POST_SYNC_COMMANDS = []
+FULLSYNC_INTERVAL = 0
 
 
 def icheck_output(*args, **kwargs):
@@ -72,17 +73,25 @@ def spawn_client(window, account, box, split=True):
     panel.send_keys(u'%s client "%s" "%s"' % (argv[0], account, box))
 
 
+def spawn_recurrent_fullsync(window):
+    panel = window.split_window()
+    window.select_layout('even-vertical')
+    panel.clear()
+    panel.send_keys(u'%s fullsync -t %s' % (argv[0], FULLSYNC_INTERVAL))
+
+
 @click.group()
 @click.option('--conf',
               default=join(user_config_dir('mailsync'), 'mailsync.conf'),
               type=click.File('r'), required=False)
 def cli(conf):
-    global ACCOUNTS, MBSYNC, POST_SYNC_COMMANDS
+    global ACCOUNTS, MBSYNC, POST_SYNC_COMMANDS, FULLSYNC_INTERVAL
     cfg = load(conf)
 
     MBSYNC = cfg['sync_command']
     POST_SYNC_COMMANDS = cfg['post_sync']
     ACCOUNTS = cfg['accounts']
+    FULLSYNC_INTERVAL = cfg.get('fullsync_interval')
 
 
 def sync(host=None, box=None):
@@ -219,3 +228,5 @@ def _main(session):
         for box in c['boxes']:
             spawn_client(window, account, box, split=bool(i))
             i += 1
+    if FULLSYNC_INTERVAL:
+        spawn_recurrent_fullsync(window)

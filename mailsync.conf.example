@@ -1,4 +1,5 @@
 sync_command: /usr/bin/mbsync
+fullsync_interval: 600
 post_sync:
     - /usr/bin/notmuch new
     - ~/.mutt/nottoomuch-addresses.sh --update
