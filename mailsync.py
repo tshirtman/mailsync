@@ -200,10 +200,16 @@ def stop_all(session):
 
 
 @cli.command('fullsync')
-@click.argument('account')
-@click.argument('box')
-def full_sync(account=None, box=None):
-    sync(host=account, box=box)
+@click.argument('account', required=False)
+@click.argument('box', required=False)
+@click.option('-t', default=0)
+def full_sync(account=None, box=None, t=0):
+    if t:
+        while True:
+            sleep(t)
+            sync(host=account, box=box)
+    else:
+        sync(host=account, box=box)
 
 
 def _main(session):
