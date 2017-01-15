@@ -19,6 +19,8 @@ from subprocess import Popen, check_output
 from sys import argv
 from time import asctime, sleep
 from yaml import load
+from signal import signal, SIGUSR2
+from functools import partial
 import click
 import libtmux
 
@@ -36,7 +38,7 @@ def icheck_output(*args, **kwargs):
     process.wait()
 
 
-def _idle_client(account, box):
+def _idle_client(account, box, state):
     c = ACCOUNTS[account]
     if 'pass_cmd' in c:
         c['pass'] = check_output([c['pass_cmd']], shell=True).strip()
@@ -53,7 +55,7 @@ def _idle_client(account, box):
     client.idle()
 
     print("connected, {}: {}".format(account, box))
-    while True:
+    while not state['got_signal']:
         for m in client.idle_check(timeout=30):
             if m != (b'OK', b'Still here'):
                 print(Style.BRIGHT + Fore.GREEN,
@@ -61,6 +63,7 @@ def _idle_client(account, box):
                       Fore.RESET + Style.RESET_ALL)
                 sync(c['local'], box)
         sleep(1)
+    client.logout()
 
 
 def spawn_client(window, account, box, split=True):
@@ -130,17 +133,33 @@ def sync(host=None, box=None):
 def idle_client(account, box):
     """connect to account and wait for events on box to sync
     """
+    state = {'got_signal': False}
+    signal(SIGUSR2, partial(handle_signal, state))
+
     while True:
         try:
             print(Style.BRIGHT + Fore.GREEN +
                   "connecting to {}:{}".format(account, box) +
                   Style.RESET_ALL + Fore.RESET)
-            _idle_client(account, box)
+            _idle_client(account, box, state)
         except Exception as e:
             print(Style.BRIGHT + Fore.RED +
                   "error {} in {}:{} connection, restarting"
                   .format(e, account, box) +
                   Fore.RESET + Style.RESET_ALL)
+
+        if state['got_signal']:
+            state['got_signal'] = False
+            print(Style.BRIGHT + Fore.YELLOW +
+                  "forced reconnection, restarting" +
+                  Fore.RESET + Style.RESET_ALL)
+            continue
+        else:
+            break
+
+
+def handle_signal(state, sig, frame):
+    state['got_signal'] = True
 
 
 @cli.command('suspend')
@@ -164,6 +183,7 @@ def run(session):
 def idle():
     """Sync all the mailboxes, then spawn clients for monitored mailboxes
     """
+    signal(SIGUSR2, partial(handle_signal, {}))
     session = get_session()
     _main(session)
     session.attach_session()
@@ -213,16 +233,32 @@ def stop_all(session):
 @click.argument('box', required=False)
 @click.option('-t', default=0)
 def full_sync(account=None, box=None, t=0):
+    state = {'got_signal': False}
+
+    signal(SIGUSR2, partial(handle_signal, state))
     if t:
         while True:
             timeout = t
-            while timeout:
-                print(timeout, end=' \r')
+            while timeout and not state['got_signal']:
+                print(' %s ' % timeout, end='\r')
                 sleep(1)
                 timeout -= 1
+            state['got_signal'] = False
             sync(host=account, box=box)
     else:
         sync(host=account, box=box)
+
+
+@cli.command('debug')
+@click.argument('account', required=False)
+def debug(account):
+    c = ACCOUNTS[account]
+    if 'pass_cmd' in c:
+        c['pass'] = check_output([c['pass_cmd']], shell=True).strip()
+    client = IMAPClient(
+        c['host'], use_uid=True, ssl=c['ssl'])
+    client.login(c['user'], c['pass'])
+    print(client.capabilities())
 
 
 def _main(session):
