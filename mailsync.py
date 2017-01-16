@@ -153,9 +153,6 @@ def idle_client(account, box):
             print(Style.BRIGHT + Fore.YELLOW +
                   "forced reconnection, restarting" +
                   Fore.RESET + Style.RESET_ALL)
-            continue
-        else:
-            break
 
 
 def handle_signal(state, sig, frame):
