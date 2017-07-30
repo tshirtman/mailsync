@@ -31,12 +31,13 @@ ACCOUNTS = {}
 MBSYNC = ''
 POST_SYNC_COMMANDS = []
 FULLSYNC_INTERVAL = 0
+SYNC_TIMEOUT = None
 
 
 def icheck_output(*args, **kwargs):
     print("calling, {}, {}".format(' '.join(map(str, args)), kwargs))
     process = Popen(*args, **kwargs)
-    process.wait()
+    return process.wait()
 
 
 def _idle_client(account, box, state):
@@ -89,28 +90,45 @@ def spawn_recurrent_fullsync(window):
               default=join(user_config_dir('mailsync'), 'mailsync.conf'),
               type=click.File('r'), required=False)
 def cli(conf):
-    global ACCOUNTS, MBSYNC, POST_SYNC_COMMANDS, FULLSYNC_INTERVAL
+    global ACCOUNTS, MBSYNC, POST_SYNC_COMMANDS, FULLSYNC_INTERVAL, \
+        SYNC_TIMEOUT
     cfg = load(conf)
 
     MBSYNC = cfg['sync_command']
     POST_SYNC_COMMANDS = cfg['post_sync']
     ACCOUNTS = cfg['accounts']
     FULLSYNC_INTERVAL = cfg.get('fullsync_interval')
+    SYNC_TIMEOUT = cfg.get('sync_timeout')
 
 
 def sync(host=None, box=None):
-    if not host:
-        print("initial sync" + Fore.LIGHTWHITE_EX + Style.DIM)
-        icheck_output(split(MBSYNC) + ['-a'])
-    else:
-        print(Style.BRIGHT + Fore.CYAN +
-              "syncing: {}:{}".format(host, box) +
-              Fore.LIGHTWHITE_EX + Style.RESET_ALL + Style.DIM)
-        icheck_output(split(MBSYNC) + ['{}:{}'.format(host, box)])
+    ret = None
+    timeout = SYNC_TIMEOUT
 
-        print(Style.RESET_ALL + Style.BRIGHT + Fore.CYAN +
-              "done syncing {}:{}".format(host, box) +
-              Fore.RESET + Style.RESET_ALL)
+    if timeout:
+        CMD = 'timeout {} {}'.format(timeout, MBSYNC)
+    else:
+        CMD = MBSYNC
+
+    while not timeout or ret in (None, 124):
+        if not host:
+            print("initial sync" + Fore.LIGHTWHITE_EX + Style.DIM)
+            ret = icheck_output(split(CMD) + ['-a'])
+        else:
+            print(Style.BRIGHT + Fore.CYAN +
+                  "syncing: {}:{}".format(host, box) +
+                  Fore.LIGHTWHITE_EX + Style.RESET_ALL + Style.DIM)
+            ret = icheck_output(split(CMD) + ['{}:{}'.format(host, box)])
+
+            if ret != 124:
+                print(Style.RESET_ALL + Style.BRIGHT + Fore.CYAN +
+                      "done syncing {}:{}".format(host, box) +
+                      Fore.RESET + Style.RESET_ALL)
+
+        if ret == 124:
+            print(Fore.RED + Style.BRIGHT +
+                  "sync timed out after %ss trying again!" % (timeout) +
+                  Style.RESET_ALL + Fore.RESET)
 
     for c in POST_SYNC_COMMANDS:
         print(Fore.YELLOW + Style.BRIGHT)
