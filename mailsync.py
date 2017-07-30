@@ -1,7 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # coding: utf-8
+
 # imap-idle for mbsync (or other imap sync)
-# copyright (c) 2016, Gabriel Pettier
+# copyright (c) 2016-2017, Gabriel Pettier
 # usage:
 # - edit the MBSYNC, GPG_COMMAND, POST_SYNC_COMMANDS and conf variables
 # to suit your configuration
