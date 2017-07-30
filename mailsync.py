@@ -195,6 +195,19 @@ def run(session):
         'mailsync fullsync; mailsync idle')
 
 
+@cli.command('list')
+@click.argument('account')
+def list_boxes(account):
+    c = ACCOUNTS[account]
+    if 'pass_cmd' in c:
+        c['pass'] = check_output([c['pass_cmd']], shell=True).strip()
+    client = IMAPClient(
+        c['host'], use_uid=True, ssl=c['ssl'])
+    client.login(c['user'], c['pass'])
+    from pprint import pprint
+    pprint(client.list_folders())
+
+
 @cli.command('idle')
 def idle():
     """Sync all the mailboxes, then spawn clients for monitored mailboxes
