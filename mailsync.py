@@ -22,6 +22,7 @@ from time import asctime, sleep
 from yaml import load
 from signal import signal, SIGUSR2
 from functools import partial
+from threading import Thread
 try:
     from NetworkManager import NetworkManager
 except:
@@ -276,6 +277,22 @@ def wait_connect():
                 sleep(1)
 
 
+def connection_canary():
+    t = Thread(target=connection_canary_thread)
+    t.daemon = True
+    t.start()
+
+
+def connection_canary_thread():
+    while True:
+        sleep(10)
+        if not connected():
+            print("lost connection, restarting…")
+            sleep(2)
+            resume()
+            break
+
+
 @cli.command('fullsync')
 @click.argument('account', required=False)
 @click.argument('box', required=False)
@@ -286,6 +303,7 @@ def full_sync(account=None, box=None, t=0):
     signal(SIGUSR2, partial(handle_signal, state))
 
     wait_connect()
+    connection_canary()
 
     if t:
         while True:
