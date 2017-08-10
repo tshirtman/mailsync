@@ -22,6 +22,11 @@ from time import asctime, sleep
 from yaml import load
 from signal import signal, SIGUSR2
 from functools import partial
+try:
+    from NetworkManager import NetworkManager
+except:
+    NetworkManager = None
+
 import click
 import libtmux
 
@@ -41,6 +46,7 @@ def icheck_output(*args, **kwargs):
 
 
 def _idle_client(account, box, state):
+    wait_connect()
     c = ACCOUNTS[account]
     if 'pass_cmd' in c:
         c['pass'] = check_output([c['pass_cmd']], shell=True).strip()
@@ -257,6 +263,19 @@ def stop_all(session):
     w.list_panes()[0].cmd('send-keys', '^C')
 
 
+def connected():
+    return any(x.State == 2 for x in NetworkManager.ActiveConnections)
+
+
+def wait_connect():
+    if NetworkManager:
+        if not connected():
+            print("waiting for connection")
+            while not connected():
+                print(".", end='')
+                sleep(1)
+
+
 @cli.command('fullsync')
 @click.argument('account', required=False)
 @click.argument('box', required=False)
@@ -265,6 +284,9 @@ def full_sync(account=None, box=None, t=0):
     state = {'got_signal': False}
 
     signal(SIGUSR2, partial(handle_signal, state))
+
+    wait_connect()
+
     if t:
         while True:
             timeout = t
