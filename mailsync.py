@@ -265,7 +265,11 @@ def stop_all(session):
 
 
 def connected():
-    return any(x.State == 2 for x in NetworkManager.ActiveConnections)
+    return any(
+        x.State == 2
+        for x in NetworkManager.ActiveConnections
+        if x.Devices[0].Driver != 'bridge'
+    )
 
 
 def wait_connect():
