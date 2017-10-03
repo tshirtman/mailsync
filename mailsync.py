@@ -51,28 +51,33 @@ def _idle_client(account, box, state):
     c = ACCOUNTS[account]
     if 'pass_cmd' in c:
         c['pass'] = check_output([c['pass_cmd']], shell=True).strip()
-    client = IMAPClient(
-        c['host'], use_uid=True, ssl=c['ssl'])
-    client.login(c['user'], c['pass'])
-    try:
-        client.select_folder(box)
-    except:
-        print(Style.BRIGHT + Fore.RED +
-              "unable to select folder {}".format(box) +
-              Fore.RESET + Style.RESET_ALL)
-        return
-    client.idle()
 
-    print("connected, {}: {}".format(account, box))
-    while not state['got_signal']:
-        for m in client.idle_check(timeout=30):
-            if m != (b'OK', b'Still here'):
-                print(Style.BRIGHT + Fore.GREEN,
-                      "event: {}, {}, {}".format(account, box, m) +
-                      Fore.RESET + Style.RESET_ALL)
-                sync(c['local'], box)
-        sleep(1)
-    client.logout()
+    try:
+        client = IMAPClient(c['host'], use_uid=True, ssl=c['ssl'])
+        client.login(c['user'], c['pass'])
+        try:
+            client.select_folder(box)
+        except:
+            print(Style.BRIGHT + Fore.RED +
+                  "unable to select folder {}".format(box) +
+                  Fore.RESET + Style.RESET_ALL)
+            client.logout()
+            return
+
+        client.idle()
+
+        print("connected, {}: {}".format(account, box))
+        while not state['got_signal']:
+            for m in client.idle_check(timeout=30):
+                if m != (b'OK', b'Still here'):
+                    print(Style.BRIGHT + Fore.GREEN,
+                          "event: {}, {}, {}".format(account, box, m) +
+                          Fore.RESET + Style.RESET_ALL)
+                    sync(c['local'], box)
+            sleep(1)
+    finally:
+        client.idle_done()
+        client.logout()
 
 
 def spawn_client(window, account, box, split=True):
@@ -210,9 +215,12 @@ def list_boxes(account):
         c['pass'] = check_output([c['pass_cmd']], shell=True).strip()
     client = IMAPClient(
         c['host'], use_uid=True, ssl=c['ssl'])
-    client.login(c['user'], c['pass'])
-    from pprint import pprint
-    pprint(client.list_folders())
+    try:
+        client.login(c['user'], c['pass'])
+        from pprint import pprint
+        pprint(client.list_folders())
+    finally:
+        client.logout()
 
 
 @cli.command('idle')
@@ -330,8 +338,11 @@ def debug(account):
         c['pass'] = check_output([c['pass_cmd']], shell=True).strip()
     client = IMAPClient(
         c['host'], use_uid=True, ssl=c['ssl'])
-    client.login(c['user'], c['pass'])
-    print(client.capabilities())
+    try:
+        client.login(c['user'], c['pass'])
+        print(client.capabilities())
+    finally:
+        client.logout()
 
 
 def _main(session):
