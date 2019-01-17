@@ -6,10 +6,9 @@
 # usage:
 # - edit the MBSYNC, GPG_COMMAND, POST_SYNC_COMMANDS and conf variables
 # to suit your configuration
-# - run imap_idle.py
+# - run mailsync.py
 # BSD licensed
 # Please see http://en.wikipedia.org/wiki/BSD_licenses
-
 
 from appdirs import user_config_dir
 from colorama import Fore, Style
@@ -49,9 +48,12 @@ def icheck_output(*args, **kwargs):
 def _idle_client(account, box, state):
     wait_connect()
     c = ACCOUNTS[account]
+    renew = 600
+
     if 'pass_cmd' in c:
         c['pass'] = check_output([c['pass_cmd']], shell=True).strip()
 
+    client = None
     try:
         client = IMAPClient(c['host'], use_uid=True, ssl=c['ssl'])
         client.login(c['user'], c['pass'])
@@ -67,17 +69,21 @@ def _idle_client(account, box, state):
         client.idle()
 
         print("connected, {}: {}".format(account, box))
-        while not state['got_signal']:
+        while not state['got_signal'] and renew > 0:
             for m in client.idle_check(timeout=30):
+                # XXX check for "BYE" events and restart the connection
                 if m != (b'OK', b'Still here'):
                     print(Style.BRIGHT + Fore.GREEN,
                           "event: {}, {}, {}".format(account, box, m) +
                           Fore.RESET + Style.RESET_ALL)
                     sync(c['local'], box)
             sleep(1)
+            renew -= 1
+
     finally:
-        client.idle_done()
-        client.logout()
+        if client:
+            client.idle_done()
+            client.logout()
 
 
 def spawn_client(window, account, box, split=True):
@@ -166,6 +172,7 @@ def idle_client(account, box):
     """
     state = {'got_signal': False}
     signal(SIGUSR2, partial(handle_signal, state))
+    retry_delay = 5
 
     while True:
         try:
@@ -175,9 +182,12 @@ def idle_client(account, box):
             _idle_client(account, box, state)
         except Exception as e:
             print(Style.BRIGHT + Fore.RED +
-                  "error {} in {}:{} connection, restarting"
-                  .format(e, account, box) +
+                  "error {} in {}:{} connection, retrying in {} seconds"
+                  .format(e, account, box, retry_delay) +
                   Fore.RESET + Style.RESET_ALL)
+            for i in range(retry_delay):
+                sleep(1)
+                print('.', end='')
 
         if state['got_signal']:
             state['got_signal'] = False
@@ -228,6 +238,7 @@ def idle():
     """Sync all the mailboxes, then spawn clients for monitored mailboxes
     """
     signal(SIGUSR2, partial(handle_signal, {}))
+    connection_canary()
     session = get_session()
     _main(session)
     session.attach_session()
@@ -315,7 +326,6 @@ def full_sync(account=None, box=None, t=0):
     signal(SIGUSR2, partial(handle_signal, state))
 
     wait_connect()
-    connection_canary()
 
     if t:
         while True:
