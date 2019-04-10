@@ -128,7 +128,7 @@ def sync(host=None, box=None):
     else:
         CMD = MBSYNC
 
-    while not timeout or ret in (None, 124):
+    while ret is None or timeout and ret == 124:
         if not host:
             print("initial sync" + Fore.LIGHTWHITE_EX + Style.DIM)
             ret = icheck_output(split(CMD) + ['-a'])
