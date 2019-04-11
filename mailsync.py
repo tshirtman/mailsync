@@ -113,7 +113,8 @@ def cli(conf):
     cfg = load(conf)
 
     MBSYNC = cfg['sync_command']
-    POST_SYNC_COMMANDS = cfg['post_sync']
+    if 'post_sync' in cfg:
+        POST_SYNC_COMMANDS = cfg['post_sync']
     ACCOUNTS = cfg['accounts']
     FULLSYNC_INTERVAL = cfg.get('fullsync_interval')
     SYNC_TIMEOUT = cfg.get('sync_timeout')
